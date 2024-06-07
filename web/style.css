@@ -44,7 +44,7 @@
     padding-left: 10%;
 
     appearance: none;
-    background: #8b9c60;
+    background: linear-gradient(90deg, rgba(158, 189, 57, 1) 0%, rgba(119, 153, 60, 1) 100%);
     border-radius: 5px;
     color: #21381e;
     font-family: 'Technology';
@@ -150,3 +150,38 @@
     pointer-events: none;
 }
 /* #endregion */
+
+.mute-status {
+    position: absolute;
+    top: 0px;
+    display: flex;
+    justify-content: flex-end;
+    opacity: 0;
+  }
+
+  .mute-status svg {
+    width: 20%;
+    margin: 4% 4% 0 0;
+    opacity: 0.9;
+  }
+
+  #is-not-muted {
+    display: none;
+  }
+
+  #volume {
+    position: absolute;
+    bottom: 4%;
+    width: 100%;
+    text-align: right;
+    box-sizing: border-box;
+    padding: 0 4%;
+    font-family: 'Technology';
+    font-size: 1.2em;
+    opacity: 0;
+  }
+
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}

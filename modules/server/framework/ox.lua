@@ -22,10 +22,10 @@ CreateThread(function()
             local isAllowed = player.getGroup(allowed) ~= nil
 
             if isAllowed then
-                lib.notify(playerId, {
-                    type = 'success',
-                    description = locale('channel_join', frequency + 0.0),
-                })
+                -- lib.notify(playerId, {
+                --     type = 'success',
+                --     description = locale('channel_join', frequency + 0.0),
+                -- })
             else
                 lib.notify(playerId, {
                     type = 'error',

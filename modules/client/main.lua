@@ -6,8 +6,13 @@ local thisUserIsUnableToReadDocumentation = false
 local isOpened = false
 local requestedFrequency = nil
 local lastVolume = nil
+local resourceName = GetCurrentResourceName()
 
-
+---@return number
+local function getRadioVolume()
+    local volume = Voice:getRadioVolume()
+    return thisUserIsUnableToReadDocumentation and volume * 100 or volume
+end
 
 CreateThread(function()
     local step = tostring(Config.frequencyStep)
@@ -22,21 +27,19 @@ CreateThread(function()
     end
 end)
 
----@return number
-local function getRadioVolume()
-    local volume = Voice:getRadioVolume()
-    return thisUserIsUnableToReadDocumentation and volume * 100 or volume
-end
-
-
-
 local function openRadio()
     if isOpened then return end
     isOpened = true
 
     TriggerEvent('ox_inventory:disarm', true)
 
-    LocalPlayer.state:set('ac:hasRadioProp', true, true)
+    TriggerServerEvent("ceeb_globals:createProp", resourceName, {
+        model = "prop_cs_hand_radio",
+        bone = 28422,
+        pos = vec3(0.0, 0.0, 0.0),
+        rot = vec3(0.0, 0.0, 0.0),
+        rotOrder = 0,
+    }, "radio")
 
     local animDict = cache.vehicle and 'cellphone@in_car@ds' or 'cellphone@'
     lib.playAnim(cache.ped, animDict, 'cellphone_text_in', 4.0, 4.0, -1, 50)
@@ -67,7 +70,7 @@ local function openRadio()
     Wait(200)
     StopAnimTask(cache.ped, animDict, 'cellphone_text_out', 1.0)
 
-    LocalPlayer.state:set('ac:hasRadioProp', false, true)
+    TriggerServerEvent("ceeb_globals:deleteProp", resourceName, "radio")
 end
 
 
@@ -89,10 +92,10 @@ local function joinFrequency(frequency)
         Voice:setRadioChannel(frequency)
 
         if not Config.restrictedChannels[frequency] then
-            lib.notify({
-                type = 'success',
-                description = locale('channel_join', frequency),
-            })
+            -- lib.notify({
+            --     type = 'success',
+            --     description = locale('channel_join', frequency),
+            -- })
         end
 
         return frequency
@@ -116,7 +119,12 @@ local function closeUi()
     requestedFrequency = nil
 end
 
-
+RegisterNUICallback('ready', function(_, cb)
+    cb(1)
+    local volume = math.floor(getRadioVolume())
+    SendNUIMessage({ action = volume == 0 and 'mute' or 'unmute' })
+    SendNUIMessage({ action = 'volume', data = math.floor(getRadioVolume()) })
+end)
 
 RegisterNUICallback('closeUi', function(_, cb)
     cb(1)
@@ -135,10 +143,10 @@ RegisterNUICallback('leaveFrequency', function(_, cb)
 
     leaveFrequency()
 
-    lib.notify({
-        type = 'success',
-        description = locale('channel_disconnect'),
-    })
+    -- lib.notify({
+    --     type = 'success',
+    --     description = locale('channel_disconnect'),
+    -- })
 end)
 
 RegisterNUICallback('volumeUp', function(_, cb)
@@ -148,31 +156,33 @@ RegisterNUICallback('volumeUp', function(_, cb)
 
     if lastVolume then
         lastVolume = nil
-        lib.notify({
-            type = 'info',
-            description = locale('volume_unmute'),
-            duration = 1000,
-        })
+        -- lib.notify({
+        --     type = 'info',
+        --     description = locale('volume_unmute'),
+        --     duration = 1000,
+        -- })
+        SendNUIMessage({ action = 'unmute' })
     end
 
     if currentVolume >= 100 then
-        return lib.notify({
-            type = 'error',
-            description = locale('volume_max'),
-            duration = 2500,
-        })
+        return
+        -- return lib.notify({
+        --     type = 'error',
+        --     description = locale('volume_max'),
+        --     duration = 2500,
+        -- })
     end
 
     local volume = math.clamp(currentVolume + Config.volumeStep, Config.volumeStep, 100)
 
     Voice:setRadioVolume(volume)
-
-    lib.notify({
-        type = 'info',
-        description = locale('volume_up', math.floor(volume)),
-        duration = 1500,
-        icon = 'volume-high',
-    })
+    SendNUIMessage({ action = 'volume', data = math.floor(volume) })
+    -- lib.notify({
+    --     type = 'info',
+    --     description = locale('volume_up', math.floor(volume)),
+    --     duration = 1500,
+    --     icon = 'volume-high',
+    -- })
 end)
 
 RegisterNUICallback('volumeDown', function(_, cb)
@@ -182,31 +192,32 @@ RegisterNUICallback('volumeDown', function(_, cb)
 
     if lastVolume then
         lastVolume = nil
-        lib.notify({
-            type = 'info',
-            description = locale('volume_unmute'),
-            duration = 1000,
-        })
+        -- lib.notify({
+        --     type = 'info',
+        --     description = locale('volume_unmute'),
+        --     duration = 1000,
+        -- })
     end
 
     if currentVolume <= Config.volumeStep then
-        return lib.notify({
-            type = 'error',
-            description = locale('volume_min'),
-            duration = 2500,
-        })
+        return
+        -- return lib.notify({
+        --     type = 'error',
+        --     description = locale('volume_min'),
+        --     duration = 2500,
+        -- })
     end
 
     local volume = math.clamp(currentVolume - Config.volumeStep, Config.volumeStep, 100)
 
     Voice:setRadioVolume(volume)
-
-    lib.notify({
-        type = 'info',
-        description = locale('volume_down', math.floor(volume)),
-        duration = 1500,
-        icon = 'volume-low',
-    })
+    SendNUIMessage({ action = 'volume', data = math.floor(volume) })
+    -- lib.notify({
+    --     type = 'info',
+    --     description = locale('volume_down', math.floor(volume)),
+    --     duration = 1500,
+    --     icon = 'volume-low',
+    -- })
 end)
 
 RegisterNUICallback('volumeMute', function(_, cb)
@@ -215,21 +226,21 @@ RegisterNUICallback('volumeMute', function(_, cb)
     if lastVolume then
         Voice:setRadioVolume(lastVolume)
         lastVolume = nil
-
-        lib.notify({
-            type = 'success',
-            description = locale('volume_unmute'),
-            icon = 'volume-high',
-        })
+        SendNUIMessage({ action = 'unmute' })
+        -- lib.notify({
+        --     type = 'success',
+        --     description = locale('volume_unmute'),
+        --     icon = 'volume-high',
+        -- })
     else
         lastVolume = getRadioVolume()
         Voice:setRadioVolume(0)
-
-        lib.notify({
-            type = 'error',
-            description = locale('volume_mute'),
-            icon = 'volume-xmark',
-        })
+        SendNUIMessage({ action = 'mute' })
+        -- lib.notify({
+        --     type = 'error',
+        --     description = locale('volume_mute'),
+        --     icon = 'volume-xmark',
+        -- })
     end
 end)
 
@@ -251,7 +262,7 @@ RegisterNUICallback('presetJoin', function(presetId, cb)
 end)
 
 ---@param frequency? number
-RegisterNUICallback('presetRequest', function (frequency, cb)
+RegisterNUICallback('presetRequest', function(frequency, cb)
     cb(1)
 
     if frequency then
@@ -288,7 +299,7 @@ if Config.useCommand then
     RegisterCommand('radio', openRadio, false)
 
     if Config.commandKey then
-        RegisterKeyMapping('radio', locale('keymap_open'), 'keyboard', Config.commandKey)
+        exports.TMA:RegisterKeyMapping('radio', locale('keymap_open'), 'keyboard', Config.commandKey)
     end
 end
 
