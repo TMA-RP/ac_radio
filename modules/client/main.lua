@@ -7,11 +7,99 @@ local isOpened = false
 local requestedFrequency = nil
 local lastVolume = nil
 local resourceName = GetCurrentResourceName()
+local isTalkingOnRadio = false
+local radioPropInRightHand = false
+local radioPropInLeftHand = false
 
 ---@return number
 local function getRadioVolume()
     local volume = Voice:getRadioVolume()
     return thisUserIsUnableToReadDocumentation and volume * 100 or volume
+end
+
+
+local function handleRadioProp()
+    local anims = {
+        hand = {
+            dict = "ultra@walkie_talkie",
+            name = "walkie_talkie"
+        },
+        text = {
+            dict = "cellphone@",
+            name = "cellphone_text_in"
+        },
+        textVehicle = {
+            dict = "cellphone@in_car@ds",
+            name = "cellphone_text_in"
+        },
+        shoulder = {
+            dict = "random@arrests",
+            name = "generic_radio_enter"
+        }
+    }
+    local anim
+    if isOpened then
+        if isTalkingOnRadio then
+            anim = anims.hand
+        else
+            if cache.vehicle then
+                anim = anims.textVehicle
+            else
+                anim = anims.text
+            end
+        end
+    else
+        if isTalkingOnRadio then
+            anim = anims.shoulder
+        end
+    end
+    if not anim then
+        for _, v in pairs(anims) do
+            if IsEntityPlayingAnim(cache.ped, v.dict, v.name, 3) then
+                StopAnimTask(cache.ped, v.dict, v.name, 5.0)
+            end
+        end
+    else
+        if not IsEntityPlayingAnim(cache.ped, anim.dict, anim.name, 3) then
+            TaskPlayAnim(cache.ped, anim.dict, anim.name, 5.0, 2.0, -1, 50, 2.0, false, false, false)
+        end
+    end
+
+    if isOpened then
+        if isTalkingOnRadio then
+            if not radioPropInLeftHand then
+                TriggerServerEvent("ceeb_globals:deleteProp", resourceName, "radio")
+                TriggerServerEvent("ceeb_globals:createProp", resourceName, {
+                    model = "prop_cs_hand_radio",
+                    bone = 18905,
+                    pos = vec3(0.140000, 0.030000, 0.030000),
+                    rot = vec3(-105.877000, -10.943200, -33.721200),
+                    rotOrder = 0,
+                }, "radio")
+                radioPropInLeftHand = true
+                radioPropInRightHand = false
+            end
+        else
+            if not radioPropInRightHand then
+                TriggerServerEvent("ceeb_globals:deleteProp", resourceName, "radio")
+                TriggerServerEvent("ceeb_globals:createProp", resourceName, {
+                    model = "prop_cs_hand_radio",
+                    bone = 28422,
+                    pos = vec3(0.0, 0.0, 0.0),
+                    rot = vec3(0.0, 0.0, 0.0),
+                    rotOrder = 0,
+                }, "radio")
+                radioPropInRightHand = true
+                radioPropInLeftHand = false
+            end
+        end
+    else
+        if radioPropInLeftHand or radioPropInRightHand then
+            TriggerServerEvent("ceeb_globals:deleteProp", resourceName, "radio")
+            radioPropInLeftHand = false
+            radioPropInRightHand = false
+        end
+    end
 end
 
 CreateThread(function()
@@ -33,17 +121,6 @@ local function openRadio()
 
     TriggerEvent('ox_inventory:disarm', true)
 
-    TriggerServerEvent("ceeb_globals:createProp", resourceName, {
-        model = "prop_cs_hand_radio",
-        bone = 28422,
-        pos = vec3(0.0, 0.0, 0.0),
-        rot = vec3(0.0, 0.0, 0.0),
-        rotOrder = 0,
-    }, "radio")
-
-    local animDict = cache.vehicle and 'cellphone@in_car@ds' or 'cellphone@'
-    lib.playAnim(cache.ped, animDict, 'cellphone_text_in', 4.0, 4.0, -1, 50)
-
     SetNuiFocus(true, true)
     SetNuiFocusKeepInput(true)
     SetCursorLocation(0.917, 0.873)
@@ -51,26 +128,21 @@ local function openRadio()
 
     while isOpened do
         DisableAllControlActions(0)
-        EnableControlAction(0, 21, true) -- INPUT_SPRINT
-        EnableControlAction(0, 22, true) -- INPUT_JUMP
-        EnableControlAction(0, 30, true) -- INPUT_MOVE_LR
-        EnableControlAction(0, 31, true) -- INPUT_MOVE_UD
-        EnableControlAction(0, 59, true) -- INPUT_VEH_MOVE_LR
-        EnableControlAction(0, 71, true) -- INPUT_VEH_ACCELERATE
-        EnableControlAction(0, 72, true) -- INPUT_VEH_BRAKE
+        EnableControlAction(0, 21, true)  -- INPUT_SPRINT
+        EnableControlAction(0, 22, true)  -- INPUT_JUMP
+        EnableControlAction(0, 30, true)  -- INPUT_MOVE_LR
+        EnableControlAction(0, 31, true)  -- INPUT_MOVE_UD
+        EnableControlAction(0, 59, true)  -- INPUT_VEH_MOVE_LR
+        EnableControlAction(0, 71, true)  -- INPUT_VEH_ACCELERATE
+        EnableControlAction(0, 72, true)  -- INPUT_VEH_BRAKE
+        EnableControlAction(0, 249, true) -- INPUT_PUSH_TO_TALK
+        handleRadioProp()
         Wait(0)
     end
 
     SetNuiFocus(false, false)
     SetNuiFocusKeepInput(false)
-
-    StopAnimTask(cache.ped, animDict, 'cellphone_text_in', 1.0)
-    Wait(100)
-    lib.playAnim(cache.ped, animDict, 'cellphone_text_out', 4.0, 4.0, -1, 50)
-    Wait(200)
-    StopAnimTask(cache.ped, animDict, 'cellphone_text_out', 1.0)
-
-    TriggerServerEvent("ceeb_globals:deleteProp", resourceName, "radio")
+    handleRadioProp()
 end
 
 
@@ -331,5 +403,19 @@ AddEventHandler('onResourceStop', function(resource)
             SetNuiFocus(false, false)
             SetNuiFocusKeepInput(false)
         end
+    end
+end)
+
+AddStateBagChangeHandler("radioActive", ("player:%s"):format(cache.serverId), function(bagName, key, value, _, replicated)
+    isTalkingOnRadio = value
+    if value then
+        CreateThread(function()
+            while isTalkingOnRadio do
+                handleRadioProp()
+                Wait(0)
+            end
+        end)
+    else
+        handleRadioProp()
     end
 end)
