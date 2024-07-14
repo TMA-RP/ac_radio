@@ -61,7 +61,9 @@ local function handleRadioProp()
         end
     else
         if not IsEntityPlayingAnim(cache.ped, anim.dict, anim.name, 3) then
+            lib.requestAnimDict(anim.dict)
             TaskPlayAnim(cache.ped, anim.dict, anim.name, 5.0, 2.0, -1, 50, 2.0, false, false, false)
+            RemoveAnimDict(anim.dict)
         end
     end
 
